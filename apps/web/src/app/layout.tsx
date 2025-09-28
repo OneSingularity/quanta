@@ -9,8 +9,6 @@ export const metadata: Metadata = {
   title: 'QUANTA - Real-Time Market Radar',
   description: 'Real-time sentiment-aware crypto market radar with AI-powered attention cards',
   manifest: '/manifest.json',
-  themeColor: '#3b82f6',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -20,6 +18,13 @@ export const metadata: Metadata = {
     icon: '/icon-192x192.png',
     apple: '/icon-192x192.png',
   },
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: '#3b82f6',
 };
 
 export default function RootLayout({

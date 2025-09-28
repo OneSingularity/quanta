@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'edge';
+
 const WORKER_URL = process.env.WORKER_URL || 'http://localhost:8787';
 
 export async function GET(
