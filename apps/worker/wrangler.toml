@@ -1,0 +1,17 @@
+name = "quanta-stream-proxy"
+account_id = "f00ba328036ba6fad81a8b90ce0dd676"
+main = "src/index.ts"
+compatibility_date = "2025-09-28"
+
+[vars]
+SUPABASE_URL = "https://mnlippoyqiirugpdsvja.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ubGlwcG95cWlpcnVncGRzdmphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMjc0OTcsImV4cCI6MjA3NDYwMzQ5N30.Fo6a0pLdu8m6tK0aceBIg5rXGcaV6FdMKJxF8mGFyN4"
+SENTRY_ENV = "production"
+
+[[kv_namespaces]]
+binding = "QUANTA_CACHE"
+id = "placeholder_kv_id"
+preview_id = "placeholder_preview_id"
+
+[triggers]
+crons = ["*/5 * * * *"]

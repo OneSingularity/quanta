@@ -1,0 +1,27 @@
+{
+  "name": "@quanta/worker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@quanta/core": "workspace:*",
+    "@supabase/supabase-js": "^2.39.7",
+    "@sentry/cloudflare": "^10.15.0",
+    "zod": "^3.22.4",
+    "onnxruntime-node": "^1.17.1",
+    "@xenova/transformers": "^2.15.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240208.0",
+    "@types/node": "^20.11.24",
+    "wrangler": "^3.28.4",
+    "typescript": "^5.4.2",
+    "eslint": "^8.57.0"
+  }
+}
