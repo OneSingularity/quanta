@@ -15,32 +15,67 @@ export interface Env {
   QUANTA_CACHE: KVNamespace;
 }
 
+const ALLOW_ORIGIN = '*'; // or put your Pages prod url for tighter CORS
+
+function addCORS(h: Headers) {
+  h.set('Access-Control-Allow-Origin', ALLOW_ORIGIN);
+  h.set('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  h.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  h.set('Access-Control-Allow-Credentials', 'true');
+}
+
+function corsResponse(body: BodyInit, init: ResponseInit = {}) {
+  const h = new Headers(init.headers);
+  addCORS(h);
+  return new Response(body, { ...init, headers: h });
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
 
+    // Handle preflight OPTIONS requests
+    if (request.method === 'OPTIONS') {
+      const h = new Headers();
+      addCORS(h);
+      return new Response(null, { status: 204, headers: h });
+    }
+
     try {
       if (path === '/health') {
-        return new Response('ok', { status: 200 });
+        return corsResponse('ok', { status: 200 });
       }
 
       if (path === '/version') {
         const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
         const kvTest = await env.QUANTA_CACHE.get('test');
         
-        return Response.json({
+        return corsResponse(JSON.stringify({
           env: env.SENTRY_ENV,
           supabase: !!supabase,
           kv: env.QUANTA_CACHE !== undefined,
           build: 'dev', // Will be replaced in CI
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
         });
       }
 
       if (path === '/sse/ticks') {
         const symbols = url.searchParams.get('symbol')?.split('|') || ['BTC-USDT', 'ETH-USDT', 'SOL-USDT'];
         const sseHandler = new SSEHandler(env);
-        return sseHandler.handleSSE(symbols);
+        const response = await sseHandler.handleSSE(symbols);
+        
+        // Add CORS headers to SSE response
+        const h = new Headers(response.headers);
+        addCORS(h);
+        
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: h
+        });
       }
 
       if (path === '/news/recent') {
@@ -62,7 +97,10 @@ export default {
           throw error;
         }
 
-        return Response.json(data || []);
+        return corsResponse(JSON.stringify(data || []), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
 
       if (path === '/alerts' && request.method === 'POST') {
@@ -79,14 +117,17 @@ export default {
           throw error;
         }
 
-        return Response.json(data);
+        return corsResponse(JSON.stringify(data), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
 
-      return new Response('quanta-stream-proxy online', { status: 200 });
+      return corsResponse('quanta-stream-proxy online', { status: 200 });
 
     } catch (error) {
       console.error('Worker error:', error);
-      return new Response('Internal Server Error', { status: 500 });
+      return corsResponse('Internal Server Error', { status: 500 });
     }
   },
 
