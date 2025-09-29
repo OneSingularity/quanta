@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Tick } from '@quanta/core';
 
 interface TickWithFeatures extends Tick {
@@ -17,18 +17,9 @@ export default function LiveTape() {
   const eventSourceRef = useRef<EventSource | null>(null);
   const priceHistoryRef = useRef<Map<string, Array<{ ts: number; price: number }>>>(new Map());
 
-  useEffect(() => {
-    connectToSSE();
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-    };
-  }, []);
-
-  const connectToSSE = () => {
+  const connectToSSE = useCallback(() => {
     setConnectionStatus('connecting');
-    
+
     const eventSource = new EventSource('/api/worker-proxy/sse/ticks?symbol=BTC-USDT|ETH-USDT|SOL-USDT');
     eventSourceRef.current = eventSource;
 
@@ -39,7 +30,7 @@ export default function LiveTape() {
     eventSource.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        
+
         if (message.type === 'tick') {
           const tick = message.data as Tick;
           updateTick(tick);
@@ -59,7 +50,16 @@ export default function LiveTape() {
         }
       }, 3000);
     };
-  };
+  }, []);
+
+  useEffect(() => {
+    connectToSSE();
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, [connectToSSE]);
 
   const updateTick = (newTick: Tick) => {
     const symbol = newTick.symbol;
@@ -69,10 +69,10 @@ export default function LiveTape() {
     if (!priceHistoryRef.current.has(symbol)) {
       priceHistoryRef.current.set(symbol, []);
     }
-    
+
     const history = priceHistoryRef.current.get(symbol)!;
     history.push({ ts: currentTime, price: currentPrice });
-    
+
     const fiveMinutesAgo = currentTime - 5 * 60 * 1000;
     const filteredHistory = history.filter(h => h.ts >= fiveMinutesAgo);
     priceHistoryRef.current.set(symbol, filteredHistory);
@@ -82,14 +82,14 @@ export default function LiveTape() {
     setTicks(prev => {
       const updated = new Map(prev);
       const prevTick = updated.get(symbol);
-      
+
       const tickWithFeatures: TickWithFeatures = {
         ...newTick,
         change: prevTick ? currentPrice - (prevTick.last || 0) : 0,
         changePercent: prevTick && prevTick.last ? ((currentPrice - prevTick.last) / prevTick.last) * 100 : 0,
         ...features,
       };
-      
+
       updated.set(symbol, tickWithFeatures);
       return updated;
     });
@@ -97,7 +97,7 @@ export default function LiveTape() {
 
   const calculateFeatures = (symbol: string, currentPrice: number, currentTime: number) => {
     const history = priceHistoryRef.current.get(symbol) || [];
-    
+
     if (history.length < 2) {
       return { r_1s: 0, r_5s: 0, rv_30s: 0 };
     }
@@ -119,10 +119,10 @@ export default function LiveTape() {
 
   const findPriceAtTime = (history: Array<{ ts: number; price: number }>, targetTime: number): number | null => {
     if (history.length === 0) return null;
-    
+
     let closest = history[0];
     if (!closest) return null;
-    
+
     let minDiff = Math.abs(closest.ts - targetTime);
 
     for (const point of history) {
@@ -143,9 +143,9 @@ export default function LiveTape() {
     for (let i = 1; i < prices.length; i++) {
       const currentPrice = prices[i];
       const prevPrice = prices[i-1];
-      
+
       if (!currentPrice || !prevPrice || prevPrice.price === 0) continue;
-      
+
       const ret = (currentPrice.price - prevPrice.price) / prevPrice.price;
       sumSquaredReturns += ret * ret;
     }
@@ -203,7 +203,7 @@ export default function LiveTape() {
                 {formatPercent(tick.changePercent || 0)}
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-4 text-xs text-gray-600">
               <div className="text-center">
                 <div className="text-gray-500">1s</div>
@@ -224,8 +224,8 @@ export default function LiveTape() {
               <div className="text-center">
                 <div className="text-gray-500">Spread</div>
                 <div>
-                  {tick.ask && tick.bid ? 
-                    ((tick.ask - tick.bid) / tick.last! * 100).toFixed(3) + '%' : 
+                  {tick.ask && tick.bid ?
+                    ((tick.ask - tick.bid) / tick.last! * 100).toFixed(3) + '%' :
                     'N/A'
                   }
                 </div>
