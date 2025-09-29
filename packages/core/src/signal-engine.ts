@@ -6,6 +6,9 @@ export interface SignalEngineConfig {
   volatility_min: number;
   volatility_max: number;
   cooldown_minutes: number;
+  enable_multi_timeframe?: boolean;
+  enable_risk_adjustment?: boolean;
+  enable_correlation_filter?: boolean;
 }
 
 export class SignalEngine {
@@ -93,7 +96,40 @@ export class SignalEngine {
     const momentumWeight = Math.abs(features.r_5s) * 100 * 0.4;
     const ofiWeight = Math.abs(features.ofi_proxy) * 0.2;
     
-    return Math.min(1.0, sentimentWeight + momentumWeight + ofiWeight);
+    let baseScore = Math.min(1.0, sentimentWeight + momentumWeight + ofiWeight);
+    
+    if (this.config.enable_risk_adjustment) {
+      const volatilityPenalty = features.rv_30s > 0.02 ? 0.1 : 0;
+      baseScore = Math.max(0.1, baseScore - volatilityPenalty);
+    }
+    
+    if (this.config.enable_multi_timeframe) {
+      const momentumConsistency = Math.sign(features.r_1s) === Math.sign(features.r_5s) ? 1.0 : 0.8;
+      baseScore *= momentumConsistency;
+    }
+    
+    return baseScore;
+  }
+
+  calculateRiskScore(features: MicroFeatures): number {
+    if (!this.config.enable_risk_adjustment) return 0;
+    
+    const volatilityRisk = Math.min(1.0, features.rv_30s / 0.05);
+    const momentumRisk = Math.abs(features.r_5s) > 0.01 ? 0.3 : 0.1;
+    const sentimentRisk = Math.abs(features.sentiment_z) > 2 ? 0.4 : 0.2;
+    
+    return Math.min(1.0, (volatilityRisk + momentumRisk + sentimentRisk) / 3);
+  }
+
+  getMultiTimeframeAnalysis(features: MicroFeatures): string[] {
+    if (!this.config.enable_multi_timeframe) return [];
+    
+    const timeframes = [];
+    if (Math.abs(features.r_1s) > 0.001) timeframes.push('1m');
+    if (Math.abs(features.r_5s) > 0.005) timeframes.push('5m');
+    if (features.rv_30s > 0.01) timeframes.push('15m');
+    
+    return timeframes;
   }
 
   evaluateAlert(policy: AlertPolicy, features: MicroFeatures): boolean {

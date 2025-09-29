@@ -97,3 +97,70 @@ export const SSEMessageSchema = z.discriminatedUnion('type', [
 ]);
 
 export type SSEMessage = z.infer<typeof SSEMessageSchema>;
+
+export const SubscriptionTierSchema = z.enum(['free', 'pro', 'enterprise']);
+
+export const UserSubscriptionSchema = z.object({
+  id: z.string(),
+  tier: SubscriptionTierSchema,
+  features: z.array(z.string()),
+  expires_at: z.string().datetime().optional(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+});
+
+export type SubscriptionTier = z.infer<typeof SubscriptionTierSchema>;
+export type UserSubscription = z.infer<typeof UserSubscriptionSchema>;
+
+export const PortfolioPositionSchema = z.object({
+  symbol: z.string(),
+  quantity: z.number(),
+  avg_price: z.number(),
+  current_price: z.number(),
+  unrealized_pnl: z.number(),
+  realized_pnl: z.number(),
+  last_updated: z.string().datetime(),
+});
+
+export type PortfolioPosition = z.infer<typeof PortfolioPositionSchema>;
+
+export const PortfolioSchema = z.object({
+  id: z.string(),
+  user_id: z.string(),
+  name: z.string(),
+  positions: z.array(PortfolioPositionSchema),
+  total_value: z.number(),
+  total_pnl: z.number(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime(),
+});
+
+export type Portfolio = z.infer<typeof PortfolioSchema>;
+
+export const BacktestConfigSchema = z.object({
+  strategy_name: z.string(),
+  symbols: z.array(z.string()),
+  start_date: z.string().datetime(),
+  end_date: z.string().datetime(),
+  initial_capital: z.number(),
+  commission: z.number().default(0.001),
+  slippage: z.number().default(0.0005),
+  walk_forward_periods: z.number().default(12),
+});
+
+export type BacktestConfig = z.infer<typeof BacktestConfigSchema>;
+
+export const BacktestResultSchema = z.object({
+  id: z.string(),
+  config: BacktestConfigSchema,
+  total_return: z.number(),
+  sharpe_ratio: z.number(),
+  max_drawdown: z.number(),
+  win_rate: z.number(),
+  profit_factor: z.number(),
+  overfitting_score: z.number(),
+  trades_count: z.number(),
+  created_at: z.string().datetime(),
+});
+
+export type BacktestResult = z.infer<typeof BacktestResultSchema>;
