@@ -64,6 +64,6 @@ jobs:
         run: cd packages/core && pnpm build
         
       - name: Deploy Worker
-        run: cd apps/worker && pnpm deploy
+        run: cd apps/worker && npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
