@@ -12,8 +12,7 @@ SENTRY_ENV = "production"
 
 [[kv_namespaces]]
 binding = "QUANTA_CACHE"
-id = "placeholder_kv_id"
-preview_id = "placeholder_preview_id"
+id = "70d6ab88abec407dbd1687ff9eb15cc2"
 
 [triggers]
 crons = ["*/5 * * * *"]
