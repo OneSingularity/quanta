@@ -1,7 +1,7 @@
 name = "quanta-stream-proxy"
 account_id = "f00ba328036ba6fad81a8b90ce0dd676"
 main = "src/index.ts"
-compatibility_date = "2025-09-28"
+compatibility_date = "2025-09-29"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
