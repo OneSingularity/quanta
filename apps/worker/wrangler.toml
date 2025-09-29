@@ -1,7 +1,9 @@
+# Force CI cache refresh - correct worker name is quanta-stream-proxy
 name = "quanta-stream-proxy"
 account_id = "f00ba328036ba6fad81a8b90ce0dd676"
 main = "src/index.ts"
-compatibility_date = "2025-09-28"
+compatibility_date = "2025-09-29"
+compatibility_flags = ["nodejs_compat"]
 
 [vars]
 SUPABASE_URL = "https://mnlippoyqiirugpdsvja.supabase.co"
@@ -10,8 +12,7 @@ SENTRY_ENV = "production"
 
 [[kv_namespaces]]
 binding = "QUANTA_CACHE"
-id = "placeholder_kv_id"
-preview_id = "placeholder_preview_id"
+id = "70d6ab88abec407dbd1687ff9eb15cc2"
 
 [triggers]
 crons = ["*/5 * * * *"]

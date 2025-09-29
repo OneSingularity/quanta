@@ -13,8 +13,8 @@ export default function AlertsPage() {
               <div>
                 <h3 className="font-semibold text-yellow-800">Coming Soon</h3>
                 <p className="text-yellow-700 text-sm mt-1">
-                  Natural language alert builder is under development. You'll be able to create alerts like:
-                  "Notify me when BTC +2σ and sentiment flips positive within 10m"
+                  Natural language alert builder is under development. You&apos;ll be able to create alerts like:
+                  &quot;Notify me when BTC +2σ and sentiment flips positive within 10m&quot;
                 </p>
               </div>
             </div>

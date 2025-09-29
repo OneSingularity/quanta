@@ -2,6 +2,8 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'edge';
+
 const WORKER_URL = process.env.WORKER_URL || 'http://localhost:8787';
 
 export async function GET(
@@ -33,8 +35,19 @@ export async function GET(
       });
     }
 
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const data = await response.json();
+      return NextResponse.json(data, { status: response.status });
+    } else {
+      const text = await response.text();
+      return new NextResponse(text, { 
+        status: response.status,
+        headers: {
+          'Content-Type': contentType || 'text/plain',
+        },
+      });
+    }
   } catch (error) {
     console.error('Worker proxy error:', error);
     return NextResponse.json(
@@ -61,8 +74,19 @@ export async function POST(
       body,
     });
 
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const data = await response.json();
+      return NextResponse.json(data, { status: response.status });
+    } else {
+      const text = await response.text();
+      return new NextResponse(text, { 
+        status: response.status,
+        headers: {
+          'Content-Type': contentType || 'text/plain',
+        },
+      });
+    }
   } catch (error) {
     console.error('Worker proxy error:', error);
     return NextResponse.json(

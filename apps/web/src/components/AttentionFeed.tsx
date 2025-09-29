@@ -22,58 +22,34 @@ export default function AttentionFeed() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const mockCards: AttentionCard[] = [
-      {
-        id: 1,
-        ts: new Date().toISOString(),
-        symbol: 'BTC',
-        direction: 'buy',
-        score: 0.85,
-        reasons: {
-          sentiment_surge: 'Positive sentiment spike (+2.3σ)',
-          momentum: '5s return: +0.8%, volume surge',
-          volatility: 'RV within normal band (0.12%)',
-        },
-        timeToLive: 300, // 5 minutes
-        confidence: 0.85,
-        articles: [
-          {
-            title: 'Bitcoin ETF Approval Rumors Surge',
-            url: 'https://example.com/btc-etf',
-            source: 'CoinDesk',
-          },
-          {
-            title: 'Major Institution Adds BTC to Treasury',
-            url: 'https://example.com/institution-btc',
-            source: 'Bloomberg',
-          },
-        ],
-      },
-      {
-        id: 2,
-        ts: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
-        symbol: 'ETH',
-        direction: 'watch',
-        score: 0.65,
-        reasons: {
-          sentiment_mixed: 'Sentiment neutral (0.1σ)',
-          momentum: 'Sideways movement, low volume',
-          volatility: 'RV elevated (0.25%)',
-        },
-        timeToLive: 180, // 3 minutes
-        confidence: 0.65,
-        articles: [
-          {
-            title: 'Ethereum Network Upgrade Delayed',
-            url: 'https://example.com/eth-upgrade',
-            source: 'CoinTelegraph',
-          },
-        ],
-      },
-    ];
+    const fetchSignals = async () => {
+      try {
+        const response = await fetch('/api/worker-proxy/signals');
+        if (response.ok) {
+          const signals = await response.json();
+          const attentionCards: AttentionCard[] = signals.map((signal: unknown, index: number) => ({
+            id: (signal as { id?: number }).id || index,
+            ts: (signal as { ts: string }).ts,
+            symbol: (signal as { symbol: string }).symbol,
+            direction: (signal as { direction: 'buy' | 'sell' | 'watch' }).direction,
+            score: (signal as { score: number }).score,
+            reasons: (signal as { reasons?: Record<string, string> }).reasons || {},
+            timeToLive: 300,
+            confidence: (signal as { score: number }).score,
+            articles: [],
+          }));
+          setCards(attentionCards);
+        } else {
+          setCards([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch signals:', error);
+        setCards([]);
+      }
+      setIsLoading(false);
+    };
 
-    setCards(mockCards);
-    setIsLoading(false);
+    fetchSignals();
 
     const interval = setInterval(() => {
       setCards(prev => 
@@ -84,7 +60,12 @@ export default function AttentionFeed() {
       );
     }, 1000);
 
-    return () => clearInterval(interval);
+    const signalRefreshInterval = setInterval(fetchSignals, 30000);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(signalRefreshInterval);
+    };
   }, []);
 
   const getDirectionColor = (direction: string) => {
