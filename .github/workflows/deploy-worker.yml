@@ -1,0 +1,37 @@
+name: Deploy Cloudflare Worker Only
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/worker/**'
+      - 'packages/core/**'
+
+jobs:
+  deploy-worker:
+    runs-on: ubuntu-latest
+    name: Deploy Worker
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          
+      - name: Install dependencies
+        run: pnpm install
+        
+      - name: Build core package
+        run: cd packages/core && pnpm build
+        
+      - name: Deploy Worker
+        run: cd apps/worker && pnpm deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
