@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
 
 const WORKER_URL = process.env.WORKER_URL || 'http://localhost:8787';
 
