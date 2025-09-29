@@ -17,49 +17,27 @@ export default function LiveTape() {
   const eventSourceRef = useRef<EventSource | null>(null);
   const priceHistoryRef = useRef<Map<string, Array<{ ts: number; price: number }>>>(new Map());
 
-  const connectToSSE = useCallback(() => {
-    setConnectionStatus('connecting');
+  const calculateFeatures = useCallback((symbol: string, currentPrice: number, currentTime: number) => {
+    const history = priceHistoryRef.current.get(symbol) || [];
 
-    const eventSource = new EventSource('/api/worker-proxy/sse/ticks?symbol=BTC-USDT|ETH-USDT|SOL-USDT');
-    eventSourceRef.current = eventSource;
+    if (history.length < 2) {
+      return { r_1s: 0, r_5s: 0, rv_30s: 0 };
+    }
 
-    eventSource.onopen = () => {
-      setConnectionStatus('connected');
-    };
+    const oneSecondAgo = currentTime - 1000;
+    const price1sAgo = findPriceAtTime(history, oneSecondAgo);
+    const r_1s = price1sAgo ? (currentPrice - price1sAgo) / price1sAgo : 0;
 
-    eventSource.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
+    const fiveSecondsAgo = currentTime - 5000;
+    const price5sAgo = findPriceAtTime(history, fiveSecondsAgo);
+    const r_5s = price5sAgo ? (currentPrice - price5sAgo) / price5sAgo : 0;
 
-        if (message.type === 'tick') {
-          const tick = message.data as Tick;
-          updateTick(tick);
-        } else if (message.type === 'ping') {
-          console.log('Heartbeat received');
-        }
-      } catch (error) {
-        console.error('Error parsing SSE message:', error);
-      }
-    };
+    const thirtySecondsAgo = currentTime - 30000;
+    const recentPrices = history.filter(h => h.ts >= thirtySecondsAgo);
+    const rv_30s = calculateRealizedVolatility(recentPrices);
 
-    eventSource.onerror = () => {
-      setConnectionStatus('disconnected');
-      setTimeout(() => {
-        if (eventSourceRef.current?.readyState === EventSource.CLOSED) {
-          connectToSSE();
-        }
-      }, 3000);
-    };
+    return { r_1s, r_5s, rv_30s };
   }, []);
-
-  useEffect(() => {
-    connectToSSE();
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-    };
-  }, [connectToSSE]);
 
   const updateTick = useCallback((newTick: Tick) => {
     const symbol = newTick.symbol;
@@ -93,29 +71,51 @@ export default function LiveTape() {
       updated.set(symbol, tickWithFeatures);
       return updated;
     });
-  }, []);
+  }, [calculateFeatures]);
 
-  const calculateFeatures = (symbol: string, currentPrice: number, currentTime: number) => {
-    const history = priceHistoryRef.current.get(symbol) || [];
+  const connectToSSE = useCallback(() => {
+    setConnectionStatus('connecting');
 
-    if (history.length < 2) {
-      return { r_1s: 0, r_5s: 0, rv_30s: 0 };
-    }
+    const eventSource = new EventSource('/api/worker-proxy/sse/ticks?symbol=BTC-USDT|ETH-USDT|SOL-USDT');
+    eventSourceRef.current = eventSource;
 
-    const oneSecondAgo = currentTime - 1000;
-    const price1sAgo = findPriceAtTime(history, oneSecondAgo);
-    const r_1s = price1sAgo ? (currentPrice - price1sAgo) / price1sAgo : 0;
+    eventSource.onopen = () => {
+      setConnectionStatus('connected');
+    };
 
-    const fiveSecondsAgo = currentTime - 5000;
-    const price5sAgo = findPriceAtTime(history, fiveSecondsAgo);
-    const r_5s = price5sAgo ? (currentPrice - price5sAgo) / price5sAgo : 0;
+    eventSource.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
 
-    const thirtySecondsAgo = currentTime - 30000;
-    const recentPrices = history.filter(h => h.ts >= thirtySecondsAgo);
-    const rv_30s = calculateRealizedVolatility(recentPrices);
+        if (message.type === 'tick') {
+          const tick = message.data as Tick;
+          updateTick(tick);
+        } else if (message.type === 'ping') {
+          console.log('Heartbeat received');
+        }
+      } catch (error) {
+        console.error('Error parsing SSE message:', error);
+      }
+    };
 
-    return { r_1s, r_5s, rv_30s };
-  };
+    eventSource.onerror = () => {
+      setConnectionStatus('disconnected');
+      setTimeout(() => {
+        if (eventSourceRef.current?.readyState === EventSource.CLOSED) {
+          connectToSSE();
+        }
+      }, 3000);
+    };
+  }, [updateTick]);
+
+  useEffect(() => {
+    connectToSSE();
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, [connectToSSE]);
 
   const findPriceAtTime = (history: Array<{ ts: number; price: number }>, targetTime: number): number | null => {
     if (history.length === 0) return null;
