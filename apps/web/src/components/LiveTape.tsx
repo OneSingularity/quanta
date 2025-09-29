@@ -61,7 +61,7 @@ export default function LiveTape() {
     };
   }, [connectToSSE]);
 
-  const updateTick = (newTick: Tick) => {
+  const updateTick = useCallback((newTick: Tick) => {
     const symbol = newTick.symbol;
     const currentTime = Date.now();
     const currentPrice = newTick.last || 0;
@@ -93,7 +93,7 @@ export default function LiveTape() {
       updated.set(symbol, tickWithFeatures);
       return updated;
     });
-  };
+  }, []);
 
   const calculateFeatures = (symbol: string, currentPrice: number, currentTime: number) => {
     const history = priceHistoryRef.current.get(symbol) || [];

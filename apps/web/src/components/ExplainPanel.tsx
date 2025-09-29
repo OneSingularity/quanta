@@ -27,54 +27,51 @@ export default function ExplainPanel() {
   const generateExplanation = useCallback(async () => {
     setIsLoading(true);
 
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      const newsResponse = await fetch(`/api/worker-proxy/news/recent?symbol=${selectedSymbol}&limit=5`);
 
-    const mockExplanation: Explanation = {
-      summary: `In the last ${timeWindow}, ${selectedSymbol} has shown significant bullish momentum driven by positive sentiment and increased trading volume. The price action suggests institutional accumulation with retail FOMO beginning to emerge.`,
-      confidence: 0.78,
-      timeWindow: timeWindow,
-      keyFactors: [
-        {
-          type: 'price',
-          description: `${selectedSymbol} gained 2.3% with strong support at $42,800`,
-          impact: 'positive',
-        },
-        {
-          type: 'sentiment',
-          description: 'Social sentiment spiked +2.1σ above mean on ETF approval rumors',
-          impact: 'positive',
-        },
-        {
-          type: 'volume',
-          description: 'Trading volume increased 45% above 30-day average',
-          impact: 'positive',
-        },
-        {
-          type: 'news',
-          description: 'Major institutional adoption announcements',
-          impact: 'positive',
-        },
-      ],
-      citations: [
-        {
-          title: 'Bitcoin ETF Approval Timeline Accelerated',
-          url: 'https://example.com/btc-etf-timeline',
-          relevance: 0.92,
-        },
-        {
-          title: 'MicroStrategy Adds Another $500M in Bitcoin',
-          url: 'https://example.com/microstrategy-btc',
-          relevance: 0.85,
-        },
-        {
-          title: 'Crypto Market Sees Institutional Inflows',
-          url: 'https://example.com/institutional-inflows',
-          relevance: 0.73,
-        },
-      ],
-    };
+      const recentNews = newsResponse.ok ? await newsResponse.json() : [];
 
-    setExplanation(mockExplanation);
+      const { generateExplanation: generateAIExplanation } = await import('../lib/webllm.js');
+      
+      const aiResult = await generateAIExplanation(
+        selectedSymbol,
+        timeWindow
+      );
+
+      const explanation: Explanation = {
+        summary: aiResult.summary,
+        confidence: aiResult.confidence,
+        timeWindow: timeWindow,
+        keyFactors: aiResult.keyFactors,
+        citations: recentNews.slice(0, 3).map((article: unknown) => ({
+          title: (article as { title: string }).title,
+          url: (article as { url: string }).url,
+          relevance: 0.8,
+        })),
+      };
+
+      setExplanation(explanation);
+    } catch (error) {
+      console.error('Failed to generate explanation:', error);
+      
+      const fallbackExplanation: Explanation = {
+        summary: `Analysis for ${selectedSymbol} over the last ${timeWindow} - AI analysis temporarily unavailable. Please try again later.`,
+        confidence: 0.5,
+        timeWindow: timeWindow,
+        keyFactors: [
+          {
+            type: 'price',
+            description: 'Real-time analysis unavailable',
+            impact: 'neutral',
+          },
+        ],
+        citations: [],
+      };
+      
+      setExplanation(fallbackExplanation);
+    }
+
     setIsLoading(false);
   }, [selectedSymbol, timeWindow]);
 

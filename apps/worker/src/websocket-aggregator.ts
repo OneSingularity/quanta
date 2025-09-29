@@ -1,141 +1,106 @@
 import { Tick, adaptCoinbaseTick, adaptBinanceTick } from '@quanta/core';
 
-export class WebSocketAggregator {
-  private coinbaseWS: WebSocket | null = null;
-  private binanceWS: WebSocket | null = null;
-  private reconnectAttempts = new Map<string, number>();
-  private maxReconnectAttempts = 5;
-  private baseReconnectDelay = 1000;
+export class RestApiAggregator {
+  private isRunning = false;
+  private intervalId: NodeJS.Timeout | null = null;
   private onTickCallback: ((tick: Tick) => void) | undefined;
+  private kvCache: KVNamespace;
+  private lastFetchTimes = new Map<string, number>();
+  private readonly POLL_INTERVAL = 2000;
+  private readonly CACHE_TTL = 60;
 
-  constructor(onTick?: (tick: Tick) => void) {
+  constructor(kvCache: KVNamespace, onTick?: (tick: Tick) => void) {
+    this.kvCache = kvCache;
     this.onTickCallback = onTick;
   }
 
   async start(): Promise<void> {
-    await Promise.all([
-      this.connectCoinbase(),
-      this.connectBinance(),
-    ]);
+    if (this.isRunning) return;
+    this.isRunning = true;
+    
+    this.fetchAllTickers().catch(console.error);
+    
+    this.intervalId = setInterval(async () => {
+      if (this.isRunning) {
+        this.fetchAllTickers().catch(console.error);
+      }
+    }, this.POLL_INTERVAL);
   }
 
   stop(): void {
-    if (this.coinbaseWS) {
-      this.coinbaseWS.close();
-      this.coinbaseWS = null;
-    }
-    if (this.binanceWS) {
-      this.binanceWS.close();
-      this.binanceWS = null;
+    this.isRunning = false;
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
     }
   }
 
-  private async connectCoinbase(): Promise<void> {
-    const exchange = 'coinbase';
-    const attempts = this.reconnectAttempts.get(exchange) || 0;
+  private async fetchAllTickers(): Promise<void> {
+    const symbols = [
+      { exchange: 'coinbase', symbol: 'BTC-USD' },
+      { exchange: 'coinbase', symbol: 'ETH-USD' },
+      { exchange: 'coinbase', symbol: 'SOL-USD' },
+    ];
 
-    if (attempts >= this.maxReconnectAttempts) {
-      console.error(`Max reconnect attempts reached for ${exchange}`);
-      return;
+    await Promise.allSettled(
+      symbols.map(({ exchange, symbol }) => this.fetchTicker(exchange, symbol))
+    );
+  }
+
+  private async fetchTicker(exchange: string, symbol: string): Promise<void> {
+    const cacheKey = `ticker:${exchange}:${symbol}`;
+    const now = Date.now();
+    const lastFetch = this.lastFetchTimes.get(cacheKey) || 0;
+
+    if (now - lastFetch < 2000) {
+      try {
+        const cached = await this.kvCache.get(cacheKey);
+        if (cached) {
+          const tick = JSON.parse(cached);
+          if (this.onTickCallback) {
+            this.onTickCallback(tick);
+          }
+          return;
+        }
+      } catch (error) {
+        console.error(`KV cache read error for ${cacheKey}:`, error);
+      }
     }
 
     try {
-      this.coinbaseWS = new WebSocket('wss://ws-feed.exchange.coinbase.com');
+      let url: string;
+      let adapter: (data: any) => Tick | null;
 
-      this.coinbaseWS.addEventListener('open', () => {
-        console.log('Coinbase WebSocket connected');
-        this.reconnectAttempts.set(exchange, 0);
+      if (exchange === 'coinbase') {
+        url = `https://api.exchange.coinbase.com/products/${symbol}/ticker`;
+        adapter = (data) => adaptCoinbaseTick({ ...data, type: 'ticker', product_id: symbol });
+      } else if (exchange === 'binance') {
+        url = `https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`;
+        adapter = (data) => adaptBinanceTick({ ...data, s: symbol, E: Date.now() });
+      } else {
+        return;
+      }
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.error(`Failed to fetch ${exchange} ${symbol}: ${response.status}`);
+        return;
+      }
+
+      const data = await response.json();
+      const tick = adapter(data);
+
+      if (tick && this.onTickCallback) {
+        this.onTickCallback(tick);
         
-        this.coinbaseWS?.send(JSON.stringify({
-          type: 'subscribe',
-          product_ids: ['BTC-USD', 'ETH-USD', 'SOL-USD'],
-          channels: ['ticker'],
-        }));
-      });
-
-      this.coinbaseWS.addEventListener('message', (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          const tick = adaptCoinbaseTick(message);
-          if (tick && this.onTickCallback) {
-            this.onTickCallback(tick);
-          }
-        } catch (error) {
-          console.error('Error processing Coinbase message:', error);
-        }
-      });
-
-      this.coinbaseWS.addEventListener('close', () => {
-        console.log('Coinbase WebSocket disconnected');
-        this.scheduleReconnect(exchange, () => this.connectCoinbase());
-      });
-
-      this.coinbaseWS.addEventListener('error', (error) => {
-        console.error('Coinbase WebSocket error:', error);
-      });
-
+        this.kvCache.put(cacheKey, JSON.stringify(tick), { expirationTtl: this.CACHE_TTL })
+          .catch(error => console.error(`KV cache write error for ${cacheKey}:`, error));
+        this.lastFetchTimes.set(cacheKey, now);
+      }
     } catch (error) {
-      console.error('Failed to connect to Coinbase:', error);
-      this.scheduleReconnect(exchange, () => this.connectCoinbase());
+      console.error(`Error fetching ${exchange} ${symbol}:`, error);
     }
-  }
-
-  private async connectBinance(): Promise<void> {
-    const exchange = 'binance';
-    const attempts = this.reconnectAttempts.get(exchange) || 0;
-
-    if (attempts >= this.maxReconnectAttempts) {
-      console.error(`Max reconnect attempts reached for ${exchange}`);
-      return;
-    }
-
-    try {
-      const streams = ['btcusdt@ticker', 'ethusdt@ticker', 'solusdt@ticker'];
-      const streamUrl = `wss://stream.binance.com:9443/ws/${streams.join('/')}`;
-      
-      this.binanceWS = new WebSocket(streamUrl);
-
-      this.binanceWS.addEventListener('open', () => {
-        console.log('Binance WebSocket connected');
-        this.reconnectAttempts.set(exchange, 0);
-      });
-
-      this.binanceWS.addEventListener('message', (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          const tick = adaptBinanceTick(message.data || message);
-          if (tick && this.onTickCallback) {
-            this.onTickCallback(tick);
-          }
-        } catch (error) {
-          console.error('Error processing Binance message:', error);
-        }
-      });
-
-      this.binanceWS.addEventListener('close', () => {
-        console.log('Binance WebSocket disconnected');
-        this.scheduleReconnect(exchange, () => this.connectBinance());
-      });
-
-      this.binanceWS.addEventListener('error', (error) => {
-        console.error('Binance WebSocket error:', error);
-      });
-
-    } catch (error) {
-      console.error('Failed to connect to Binance:', error);
-      this.scheduleReconnect(exchange, () => this.connectBinance());
-    }
-  }
-
-  private scheduleReconnect(exchange: string, reconnectFn: () => Promise<void>): void {
-    const attempts = this.reconnectAttempts.get(exchange) || 0;
-    this.reconnectAttempts.set(exchange, attempts + 1);
-
-    const delay = this.baseReconnectDelay * Math.pow(2, attempts) + Math.random() * 1000;
-    
-    setTimeout(() => {
-      console.log(`Attempting to reconnect ${exchange} (attempt ${attempts + 1})`);
-      reconnectFn();
-    }, delay);
   }
 }
+
+export const WebSocketAggregator = RestApiAggregator;

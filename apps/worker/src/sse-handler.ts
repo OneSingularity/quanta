@@ -10,10 +10,6 @@ export class SSEHandler {
   }
 
   async handleSSE(symbols: string[]): Promise<Response> {
-    const { readable, writable } = new TransformStream();
-    const writer = writable.getWriter();
-    const encoder = new TextEncoder();
-
     const headers = new Headers({
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
@@ -22,49 +18,50 @@ export class SSEHandler {
       'Access-Control-Allow-Headers': 'Cache-Control',
     });
 
-    await writer.write(encoder.encode('retry: 3000\n\n'));
+    const env = this.env;
 
-    const aggregator = new WebSocketAggregator((tick: Tick) => {
-      if (symbols.includes(tick.symbol)) {
-        const message: SSEMessage = {
-          type: 'tick',
-          data: tick,
-        };
+    const stream = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder();
         
-        const sseData = `data: ${JSON.stringify(message)}\n\n`;
-        writer.write(encoder.encode(sseData)).catch(console.error);
-      }
+        controller.enqueue(encoder.encode('retry: 3000\n\n'));
+        
+        const aggregator = new WebSocketAggregator(env.QUANTA_CACHE, (tick: Tick) => {
+          if (symbols.includes(tick.symbol)) {
+            const message: SSEMessage = {
+              type: 'tick',
+              data: tick,
+            };
+            
+            const sseData = `data: ${JSON.stringify(message)}\n\n`;
+            try {
+              controller.enqueue(encoder.encode(sseData));
+            } catch (error) {
+              console.error('Error enqueueing tick data:', error);
+            }
+          }
+        });
+
+        aggregator.start().catch(console.error);
+
+        const heartbeatInterval = setInterval(() => {
+          const pingMessage: SSEMessage = {
+            type: 'ping',
+            data: { ts: new Date().toISOString() },
+          };
+          
+          const sseData = `data: ${JSON.stringify(pingMessage)}\n\n`;
+          try {
+            controller.enqueue(encoder.encode(sseData));
+          } catch (error) {
+            clearInterval(heartbeatInterval);
+            aggregator.stop();
+            controller.close();
+          }
+        }, 15000);
+      },
     });
 
-    await aggregator.start();
-
-    const heartbeatInterval = setInterval(() => {
-      const pingMessage: SSEMessage = {
-        type: 'ping',
-        data: { ts: new Date().toISOString() },
-      };
-      
-      const sseData = `data: ${JSON.stringify(pingMessage)}\n\n`;
-      writer.write(encoder.encode(sseData)).catch(() => {
-        clearInterval(heartbeatInterval);
-        aggregator.stop();
-        writer.close();
-      });
-    }, 15000);
-
-    const response = new Response(readable, { headers });
-    
-    response.body?.pipeTo(new WritableStream({
-      close() {
-        clearInterval(heartbeatInterval);
-        aggregator.stop();
-      },
-      abort() {
-        clearInterval(heartbeatInterval);
-        aggregator.stop();
-      },
-    }));
-
-    return response;
+    return new Response(stream, { headers });
   }
 }

@@ -43,6 +43,27 @@ export default {
         return sseHandler.handleSSE(symbols);
       }
 
+      if (path === '/signals') {
+        const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+        const { data, error } = await supabase
+          .from('signals')
+          .select('*')
+          .order('ts', { ascending: false })
+          .limit(10);
+        
+        if (error) {
+          console.error('Error fetching signals:', error);
+          return new Response(JSON.stringify({ error: 'Failed to fetch signals' }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify(data || []), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
       if (path === '/news/recent') {
         const symbol = url.searchParams.get('symbol') || 'BTC';
         const limit = parseInt(url.searchParams.get('limit') || '30');
