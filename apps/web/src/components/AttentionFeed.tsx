@@ -25,7 +25,7 @@ interface AttentionCard {
 export default function AttentionFeed() {
   const [cards, setCards] = useState<AttentionCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { hasFeature, tier } = useSubscription();
+  const { hasFeature } = useSubscription();
 
   useEffect(() => {
     const fetchSignals = async () => {
@@ -78,7 +78,7 @@ export default function AttentionFeed() {
       clearInterval(interval);
       clearInterval(signalRefreshInterval);
     };
-  }, []);
+  }, [hasFeature]);
 
   const getDirectionColor = (direction: string) => {
     switch (direction) {

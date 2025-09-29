@@ -13,24 +13,6 @@ interface SubscriptionContextType {
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
-const FEATURE_TIERS: Record<string, SubscriptionTier[]> = {
-  'basic_signals': ['free', 'pro', 'enterprise'],
-  'live_data': ['free', 'pro', 'enterprise'],
-  'ai_analysis': ['free', 'pro', 'enterprise'],
-  'portfolio_analytics': ['pro', 'enterprise'],
-  'advanced_signals': ['pro', 'enterprise'],
-  'backtesting': ['pro', 'enterprise'],
-  'custom_alerts': ['pro', 'enterprise'],
-  'real_time_monitoring': ['pro', 'enterprise'],
-  'correlation_analysis': ['pro', 'enterprise'],
-  'risk_metrics': ['pro', 'enterprise'],
-  'api_access': ['enterprise'],
-  'white_label': ['enterprise'],
-  'priority_support': ['enterprise'],
-  'unlimited_backtests': ['enterprise'],
-  'advanced_risk_management': ['enterprise'],
-  'model_marketplace': ['enterprise'],
-};
 
 const TIER_FEATURES: Record<SubscriptionTier, string[]> = {
   free: [
@@ -131,7 +113,7 @@ export function FeatureGate({
   children: React.ReactNode; 
   fallback?: React.ReactNode;
 }) {
-  const { hasFeature, upgradeRequired } = useSubscription();
+  const { hasFeature } = useSubscription();
 
   if (hasFeature(feature)) {
     return <>{children}</>;

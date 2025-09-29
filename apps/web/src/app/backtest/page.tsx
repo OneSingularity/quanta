@@ -18,7 +18,7 @@ interface BacktestResult {
 }
 
 export default function BacktestPage() {
-  const { hasFeature } = useSubscription();
+  const { } = useSubscription();
   const [isRunning, setIsRunning] = useState(false);
   const [selectedStrategy, setSelectedStrategy] = useState('rsi_momentum');
   

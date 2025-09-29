@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { FeatureGate, useSubscription } from '../../contexts/SubscriptionContext';
 import Navigation from '../../components/Navigation';
 
@@ -29,8 +29,8 @@ interface Position {
 }
 
 export default function PortfolioPage() {
-  const { hasFeature } = useSubscription();
-  const [portfolioMetrics, setPortfolioMetrics] = useState<PortfolioMetrics>({
+  const { } = useSubscription();
+  const [portfolioMetrics] = useState<PortfolioMetrics>({
     totalValue: 125420.50,
     totalPnL: 8420.50,
     sharpeRatio: 1.85,
@@ -39,14 +39,14 @@ export default function PortfolioPage() {
     var95: -2850.00,
   });
 
-  const [positions, setPositions] = useState<Position[]>([
+  const [positions] = useState<Position[]>([
     { symbol: 'BTC', quantity: 2.5, avgPrice: 42000, currentPrice: 43500, unrealizedPnL: 3750, weight: 65.2 },
     { symbol: 'ETH', quantity: 15.0, avgPrice: 2800, currentPrice: 2950, unrealizedPnL: 2250, weight: 26.5 },
     { symbol: 'SOL', quantity: 100, avgPrice: 85, currentPrice: 92, unrealizedPnL: 700, weight: 5.5 },
     { symbol: 'AVAX', quantity: 50, avgPrice: 35, currentPrice: 38, unrealizedPnL: 150, weight: 2.8 },
   ]);
 
-  const [correlationMatrix, setCorrelationMatrix] = useState<CorrelationData[]>([
+  const [correlationMatrix] = useState<CorrelationData[]>([
     { symbol1: 'BTC', symbol2: 'ETH', correlation: 0.85 },
     { symbol1: 'BTC', symbol2: 'SOL', correlation: 0.72 },
     { symbol1: 'BTC', symbol2: 'AVAX', correlation: 0.68 },
